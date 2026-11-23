@@ -1,0 +1,116 @@
+================================================================================
+CALCULATIONS & FORMULAS FOR REALISTIC HUMAN AI MODEL MOVEMENT
+================================================================================
+
+This reference sheet provides the mathematical formulas, timing curves, and
+prompt pacing structures used to eliminate robotic stiffness, foot sliding,
+and unnatural physics in 3D AI character animation and video generation.
+
+--------------------------------------------------------------------------------
+1. INVERSE KINEMATICS (IK) & GROUND CONTACT (PREVENTING FOOT SLIDING)
+--------------------------------------------------------------------------------
+To keep feet locked firmly to the ground during weight shifts, joint angles
+(theta) are solved backward from the target foot position (x_target) using
+the Jacobian Transpose or Damped Least Squares (Levenberg-Marquardt) method:
+
+  Delta_theta = J^T * (J * J^T + lambda^2 * I)^(-1) * e
+
+  Where:
+  - Delta_theta : Change in joint angles (hip, knee, ankle)
+  - J           : Jacobian matrix of partial derivatives (dx / d_theta)
+  - J^T         : Transpose of the Jacobian matrix
+  - lambda      : Damping constant (prevents singularities at full leg extension)
+  - I           : Identity matrix
+  - e           : Position error vector (x_target - x_current)
+
+Ground Lock Rule:
+  - When Foot Velocity (v_foot) < 0.02 m/s AND Height (y_foot) <= Ground_Y:
+    Lock end-effector world coordinates (X, Y, Z) until heel-off phase.
+
+--------------------------------------------------------------------------------
+2. CENTER OF MASS (CoM) & DYNAMIC BALANCE (WALKING GAIT)
+--------------------------------------------------------------------------------
+Natural human walking is controlled falling. Before lifting a foot, the
+pelvis shifts laterally so the Center of Mass (CoM) stays within the Base of
+Support (BoS) of the standing foot.
+
+  CoM_total = (Sum of (m_i * r_i)) / M_total
+
+  Where:
+  - m_i     : Mass of body segment i (head ~8%, torso ~50%, each leg ~16%, etc.)
+  - r_i     : 3D position vector (x, y, z) of segment i's center
+  - M_total : Total body mass
+
+Zero-Moment Point (ZMP) Stability Check (for dynamic motion):
+  x_ZMP = x_CoM - (z_CoM / (z_dd_CoM + g)) * x_dd_CoM
+
+  Where:
+  - x_CoM, z_CoM       : Horizontal and vertical CoM coordinates
+  - x_dd_CoM, z_dd_CoM : Horizontal and vertical CoM accelerations
+  - g                  : Gravitational acceleration (9.81 m/s^2)
+  - Rule               : For realistic balance, (x_ZMP, y_ZMP) must remain
+                         inside the polygon of the grounded foot/feet.
+
+Standard Walk Cycle Timing (at 120 BPM / 1.0 sec per full 2-step stride):
+  - 0% - 10%  : Heel Strike & Loading Response (Double Support)
+  - 10% - 30% : Mid-Stance (Pelvis shifts laterally ~2-4 cm over standing leg)
+  - 30% - 50% : Terminal Stance & Heel-Off (Forward weight fall begins)
+  - 50% - 60% : Pre-Swing (Opposite foot strikes ground; Double Support)
+  - 60% - 100%: Swing Phase (Knee flexes ~60 deg; opposite arm swings forward)
+
+--------------------------------------------------------------------------------
+3. SPLINE INTERPOLATION (NATURAL MUSCLE ACCELERATION / EASE-IN & EASE-OUT)
+--------------------------------------------------------------------------------
+Linear movement looks mechanical. Human muscles accelerate smoothly, hit peak
+velocity mid-action, and decelerate into a settle. Use a Cubic Bezier curve:
+
+  B(t) = (1 - t)^3 * P0 + 3(1 - t)^2 * t * P1 + 3(1 - t) * t^2 * P2 + t^3 * P3
+
+  Where:
+  - t          : Normalized time from 0.0 (start) to 1.0 (end)
+  - P0, P3     : Start and end keyframe values (angle or position)
+  - P1, P2     : Control handles governing acceleration and deceleration
+
+Recommended Realism Curves (CSS/Animation Cubic-Bezier equivalents):
+  - Natural Reach / Turn : cubic-bezier(0.25, 0.10, 0.25, 1.00)
+  - Fast Punch / Burst   : cubic-bezier(0.16, 1.00, 0.30, 1.00)
+  - Heavy Weight Lift    : cubic-bezier(0.55, 0.05, 0.68, 0.19)
+
+--------------------------------------------------------------------------------
+4. SECONDARY MOTION & FOLLOW-THROUGH (SPRING-DAMPER PHYSICS)
+--------------------------------------------------------------------------------
+Hair, clothing, fingers, and relaxed shoulders lag behind primary torso
+motion and settle with slight overshoot. Calculated via Damped Harmonic Motion:
+
+  F = -k * x - c * v
+  a = (-k * (x_current - x_target) - c * v_current) / m
+
+  Where:
+  - F : Restoring force
+  - k : Stiffness constant (high for stiff joints, low for loose hair/cloth)
+  - x : Displacement from rest pose (x_current - x_target)
+  - c : Damping coefficient (prevents infinite oscillation; critical damping
+        is c = 2 * sqrt(m * k))
+  - v : Current velocity of the secondary part
+  - m : Mass of the secondary part
+
+--------------------------------------------------------------------------------
+5. AI VIDEO GENERATOR PROMPT & TIMING CALCULATION (24 FPS / 5-SECOND CLIP)
+--------------------------------------------------------------------------------
+When using generative video AI (Kling, Runway, Higgsfield), calculate pacing by
+dividing a 5-second clip (120 frames at 24 fps) into distinct physical beats:
+
+  [Frames 001-030 | 0.0s - 1.25s] : Stance & Micro-Movement
+                                    (Subtle chest inhale, natural blink, weight
+                                    settled on back hip)
+  [Frames 031-060 | 1.25s - 2.50s]: Anticipation & Weight Shift
+                                    (Eyes lead the turn first, pelvis shifts
+                                    over lead leg before step)
+  [Frames 061-095 | 2.50s - 3.95s]: Primary Action (Peak Velocity)
+                                    (Smooth forward step, natural counter-arm
+                                    swing, fabric/hair drag)
+  [Frames 096-120 | 3.95s - 5.00s]: Deceleration & Settle (Follow-Through)
+                                    (Heel plants firmly, shoulders relax down,
+                                    camera holds steady handheld drift)
+
+================================================================================

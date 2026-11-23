@@ -1,0 +1,6 @@
+{
+  "name": "Bharat-AI Pocket Engine",
+  "description": "On-device WebGL shader, procedural audio, and articulated character cinema studio with full Android Kotlin engine export.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
